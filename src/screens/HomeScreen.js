@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import CameraPreview from '../components/CameraPreview';
-import styles from '../styles/HomeScreenStyle'; // import the styles
+import styles from '../styles/HomeScreenStyle';
+import { getMockLatestReading, getMockAlerts } from '../services/mockData';
 
 const PI_BASE_URL = 'http://192.168.1.104:5000'; // Your Pi's IP
 const MOISTURE_THRESHOLD = 500; // Same as in logger – adjust after calibration
@@ -26,11 +27,13 @@ export default function HomeScreen({ navigation }) {
     timestamp: null,
   });
   const [alerts, setAlerts] = useState([]);
+  const [isUsingMock, setIsUsingMock] = useState(false);
   const lastAlertState = useRef('');
 
   const fetchLatestData = async () => {
     try {
       const response = await fetch(`${PI_BASE_URL}/api/latest`);
+      if (!response.ok) throw new Error('Network response not ok');
       const data = await response.json();
       if (data && !data.error) {
         setSensorData({
@@ -41,9 +44,20 @@ export default function HomeScreen({ navigation }) {
           soil_temperature: data.soil_temperature,
           timestamp: data.timestamp,
         });
+        setIsUsingMock(false);
       }
     } catch (error) {
-      console.log('Error fetching sensor data:', error);
+      console.log('Error fetching sensor data, using mock:', error);
+      const mock = getMockLatestReading();
+      setSensorData({
+        light_percent: mock.light_percent,
+        air_temperature: mock.air_temperature,
+        air_humidity: mock.air_humidity,
+        soil_moisture_raw: mock.soil_moisture_raw,
+        soil_temperature: mock.soil_temperature,
+        timestamp: mock.timestamp,
+      });
+      setIsUsingMock(true);
     } finally {
       setLoading(false);
     }
@@ -52,6 +66,7 @@ export default function HomeScreen({ navigation }) {
   const checkForAlerts = async () => {
     try {
       const response = await fetch(`${PI_BASE_URL}/api/check-alerts`);
+      if (!response.ok) throw new Error('Network error');
       const result = await response.json();
       if (result.alert_count > 0) {
         setAlerts(result.alerts);
@@ -65,7 +80,17 @@ export default function HomeScreen({ navigation }) {
         lastAlertState.current = '';
       }
     } catch (error) {
-      console.log('Polling error:', error);
+      console.log('Polling error, using mock alerts:', error);
+      const mockAlerts = getMockAlerts();
+      setAlerts(mockAlerts.alerts);
+      // Optionally handle lastAlertState for mock
+      if (mockAlerts.alert_count > 0) {
+        const alertSummary = mockAlerts.alerts.map(a => a.type).join(',');
+        if (alertSummary !== lastAlertState.current) {
+          Alert.alert('🌱 Plant Alert (Demo)', mockAlerts.alerts[0].message);
+          lastAlertState.current = alertSummary;
+        }
+      }
     }
   };
 
@@ -122,6 +147,12 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.headerIcon}>📷</Text>
         </TouchableOpacity>
       </View>
+
+      {isUsingMock && (
+        <View style={{ backgroundColor: '#FFE082', padding: 4, alignItems: 'center' }}>
+          <Text style={{ fontSize: 12, color: '#8D6E63' }}>📱 Offline Demo Mode</Text>
+        </View>
+      )}
 
       {alerts.length > 0 && (
         <View style={styles.alertBanner}>
@@ -225,7 +256,6 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       )}
 
-      <Text style={styles.hint}>Tap any card to view history</Text>
       <View style={styles.footer}>
         <Text style={styles.lastReading}>
           Last reading:{' '}

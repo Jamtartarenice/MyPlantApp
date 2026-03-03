@@ -10,7 +10,8 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
-import styles from '../styles/HistoryScreenStyle'; // import the styles
+import styles from '../styles/HistoryScreenStyle';
+import { generateMockHistory } from '../services/mockData';
 
 const screenWidth = Dimensions.get('window').width;
 const PI_BASE_URL = 'http://192.168.1.104:5000'; // Replace with your Pi's IP
@@ -30,6 +31,7 @@ export default function HistoryScreen({ route, navigation }) {
   const [allData, setAllData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [selectedRange, setSelectedRange] = useState(RANGES[1]); // default 24h
+  const [isUsingMock, setIsUsingMock] = useState(false);
 
   const sensorConfig = {
     temperature: { field: 'air_temperature', unit: '°C', color: '#F5A623', optimalRange: '18–26°C' },
@@ -45,17 +47,22 @@ export default function HistoryScreen({ route, navigation }) {
     try {
       setError(null);
       const response = await fetch(`${PI_BASE_URL}/api/history?hours=720`);
+      if (!response.ok) throw new Error('Network error');
       const data = await response.json();
       if (Array.isArray(data)) {
         const sorted = data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         setAllData(sorted);
         filterDataByRange(sorted, selectedRange);
+        setIsUsingMock(false);
       } else {
         setError('Invalid data format');
       }
     } catch (err) {
-      setError('Failed to load history');
-      console.log(err);
+      console.log('Failed to load history, using mock data:', err);
+      const mockData = generateMockHistory(7, 30); // 7 days, 30-min intervals
+      setAllData(mockData);
+      filterDataByRange(mockData, selectedRange);
+      setIsUsingMock(true);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -154,6 +161,12 @@ export default function HistoryScreen({ route, navigation }) {
       }
     >
       <Text style={styles.title}>{sensor.charAt(0).toUpperCase() + sensor.slice(1)} History</Text>
+
+      {isUsingMock && (
+        <Text style={{ textAlign: 'center', fontSize: 12, color: '#FFA000', marginBottom: 8 }}>
+          ⚡ Offline Demo Data
+        </Text>
+      )}
 
       <View style={styles.rangeContainer}>
         {RANGES.map((range) => (
