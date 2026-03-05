@@ -12,11 +12,12 @@ import { StatusBar } from 'expo-status-bar';
 import CameraPreview from '../components/CameraPreview';
 import styles from '../styles/HomeScreenStyle';
 import { getMockLatestReading, getMockAlerts } from '../services/mockData';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const PI_BASE_URL = 'http://192.168.1.104:5000'; // Your Pi's IP
+const PI_BASE_URL = 'http://192.168.1.48:5000'; // Your Pi's IP
 const MOISTURE_THRESHOLD = 500; // Same as in logger – adjust after calibration
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, setUserToken }) {
   const [loading, setLoading] = useState(true);
   const [sensorData, setSensorData] = useState({
     light_percent: null,
@@ -83,7 +84,6 @@ export default function HomeScreen({ navigation }) {
       console.log('Polling error, using mock alerts:', error);
       const mockAlerts = getMockAlerts();
       setAlerts(mockAlerts.alerts);
-      // Optionally handle lastAlertState for mock
       if (mockAlerts.alert_count > 0) {
         const alertSummary = mockAlerts.alerts.map(a => a.type).join(',');
         if (alertSummary !== lastAlertState.current) {
@@ -111,6 +111,12 @@ export default function HomeScreen({ navigation }) {
 
   const handleHelpPress = () => {
     Alert.alert('Help', 'Contact support at plant@monitor.com');
+  };
+
+  // Logout function
+  const handleLogout = async () => {
+    await AsyncStorage.clear();
+    setUserToken(null); // This will switch back to Login screen
   };
 
   const formatValue = (value, unit, decimals = 1) => {
@@ -263,10 +269,15 @@ export default function HomeScreen({ navigation }) {
             ? new Date(sensorData.timestamp).toLocaleString()
             : 'never'}
         </Text>
-        <TouchableOpacity onPress={handleHelpPress}>
-          <Text style={styles.helpLink}>Need help? 😊</Text>
-        </TouchableOpacity>
       </View>
+      
+      {/* Logout button (dev only) */}
+      <TouchableOpacity
+        onPress={handleLogout}
+        style={{ marginTop: 10, marginBottom: 20, alignItems: 'center' }}
+      >
+        <Text style={{ color: '#f44336', fontSize: 16 }}>🚪 Logout (dev only)</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }

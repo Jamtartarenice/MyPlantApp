@@ -14,7 +14,7 @@ import styles from '../styles/HistoryScreenStyle';
 import { generateMockHistory } from '../services/mockData';
 
 const screenWidth = Dimensions.get('window').width;
-const PI_BASE_URL = 'http://192.168.1.104:5000'; // Replace with your Pi's IP
+const PI_BASE_URL = 'http://192.168.1.48:5000'; // Replace with your Pi's IP
 
 const RANGES = [
   { label: '1h', hours: 1 },
