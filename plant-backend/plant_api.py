@@ -1,77 +1,113 @@
-#!/usr/bin/env python3
-import sqlite3
+# plant_api.py
+import os
 import hashlib
 import secrets
+from datetime import datetime
 from flask import Flask, jsonify, request, g
 from flask_cors import CORS
-from datetime import datetime, timedelta
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from psycopg2.pool import SimpleConnectionPool
 
-DB_PATH = 'plant_data.db'
 app = Flask(__name__)
 CORS(app)
 
-# ------------------- Database helpers -------------------
+# Database configuration
+DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres:password@localhost/plant_monitor')
+
+# Connection pool
+pool = SimpleConnectionPool(1, 10, dsn=DATABASE_URL)
+
 def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect(DB_PATH)
-        db.row_factory = sqlite3.Row
-    return db
+    """Get a database connection from the pool"""
+    if 'db' not in g:
+        g.db = pool.getconn()
+    return g.db
 
 @app.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, '_database', None)
+def close_db(e=None):
+    """Return connection to pool when request ends"""
+    db = g.pop('db', None)
     if db is not None:
-        db.close()
+        pool.putconn(db)
 
-# ------------------- Authentication helpers -------------------
+def init_db():
+    """Create tables if they don't exist"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS sensor_readings (
+            id SERIAL PRIMARY KEY,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            light_raw INTEGER,
+            light_percent REAL,
+            air_temperature REAL,
+            air_humidity REAL,
+            soil_moisture_raw INTEGER,
+            soil_moisture_status TEXT,
+            soil_temperature REAL,
+            notes TEXT
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+
+# Initialize database
+with app.app_context():
+    init_db()
+
 def hash_password(password):
-    """Simple hash (use bcrypt in production)"""
     return hashlib.sha256(password.encode()).hexdigest()
 
 def generate_token():
     return secrets.token_hex(16)
 
-# ------------------- Existing endpoints (slightly modified) -------------------
 @app.route('/api/latest', methods=['GET'])
 def get_latest():
-    db = get_db()
-    cur = db.execute('SELECT * FROM sensor_readings ORDER BY timestamp DESC LIMIT 1')
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute('SELECT * FROM sensor_readings ORDER BY timestamp DESC LIMIT 1')
     row = cur.fetchone()
     if row:
-        return jsonify(dict(row))
+        return jsonify(row)
     return jsonify({"error": "No data"}), 404
 
 @app.route('/api/history', methods=['GET'])
 def get_history():
     hours = request.args.get('hours', default=24, type=int)
-    db = get_db()
-    cur = db.execute('''
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute('''
         SELECT * FROM sensor_readings
-        WHERE timestamp >= datetime('now', ?)
+        WHERE timestamp >= NOW() - INTERVAL '%s hours'
         ORDER BY timestamp DESC
-    ''', (f'-{hours} hours',))
+    ''', (hours,))
     rows = cur.fetchall()
     return jsonify([dict(r) for r in rows])
 
 @app.route('/api/check-alerts', methods=['GET'])
 def check_alerts():
-    db = get_db()
-    cur = db.execute('SELECT * FROM sensor_readings ORDER BY timestamp DESC LIMIT 1')
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute('SELECT * FROM sensor_readings ORDER BY timestamp DESC LIMIT 1')
     row = cur.fetchone()
     if not row:
         return jsonify({"error": "No data"}), 404
     data = dict(row)
     alerts = []
-    # (same threshold logic as before)
     if data.get('soil_moisture_status') == 'DRY':
         alerts.append({"type": "water", "message": "Soil is dry – time to water!", "severity": "high"})
     if data.get('air_temperature') and data['air_temperature'] > 30:
         alerts.append({"type": "temperature", "message": f"Temperature high ({data['air_temperature']:.1f}°C)", "severity": "medium"})
-    # add more thresholds if needed
     return jsonify({"timestamp": data['timestamp'], "alert_count": len(alerts), "alerts": alerts})
 
-# ------------------- NEW AUTH ENDPOINTS -------------------
 @app.route('/api/signup', methods=['POST'])
 def signup():
     data = request.get_json()
@@ -80,33 +116,39 @@ def signup():
     if not username or not password:
         return jsonify({"error": "Username and password required"}), 400
 
-    db = get_db()
-    # Check if user exists
-    cur = db.execute('SELECT id FROM users WHERE username = ?', (username,))
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('SELECT id FROM users WHERE username = %s', (username,))
     if cur.fetchone():
         return jsonify({"error": "Username already taken"}), 400
 
     password_hash = hash_password(password)
-    db.execute('INSERT INTO users (username, password_hash) VALUES (?, ?)',
-               (username, password_hash))
-    db.commit()
+    cur.execute('INSERT INTO users (username, password_hash) VALUES (%s, %s)',
+                (username, password_hash))
+    conn.commit()
 
-    # Return a token (simple – just a random string; in production use JWT)
     token = generate_token()
-    # You could store token in a separate table, but for simplicity we'll just return it
-    # For now, we'll assume the client keeps this token.
+    # In a real app, store token in a sessions table
     return jsonify({"message": "User created", "token": token}), 201
 
-@app.route('/api/login', methods=['POST'])
+@app.route('/api/login', methods=['POST', 'OPTIONS'])
 def login():
+    if request.method == 'OPTIONS':
+        response = app.make_response('')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        response.headers.add("Access-Control-Allow-Methods", "POST")
+        return response
+
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
     if not username or not password:
         return jsonify({"error": "Username and password required"}), 400
 
-    db = get_db()
-    cur = db.execute('SELECT * FROM users WHERE username = ?', (username,))
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute('SELECT * FROM users WHERE username = %s', (username,))
     user = cur.fetchone()
     if not user:
         return jsonify({"error": "Invalid credentials"}), 401
@@ -119,25 +161,9 @@ def login():
     return jsonify({
         "message": "Login successful",
         "token": token,
-        "user": {
-            "id": user['id'],
-            "username": user['username'],
-            "created_at": user['created_at']
-        }
+        "user": {"id": user['id'], "username": user['username'], "created_at": user['created_at']}
     }), 200
-@app.route('/api/user', methods=['GET'])
-def get_user():
-    # For demonstration, we'll accept a token in the header
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        return jsonify({"error": "Missing or invalid token"}), 401
-    token = auth_header.split(' ')[1]
-    # In a real app, you'd validate the token against a stored session.
-    # For simplicity, we'll just return a dummy user.
-    # You could store tokens in a `sessions` table.
-    return jsonify({"username": "demo_user"})
 
 if __name__ == '__main__':
-    print("🌱 Plant Monitor API with Authentication")
-    print("Running on http://localhost:5000")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)

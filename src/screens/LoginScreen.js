@@ -12,8 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const PI_BASE_URL = 'http://192.168.1.48:5000'; // Replace with your PC's IP
+import { API_URL } from '../config';
 
 export default function LoginScreen({ setUserToken }) {
   const [username, setUsername] = useState('');
@@ -30,7 +29,7 @@ export default function LoginScreen({ setUserToken }) {
     setLoading(true);
     try {
       const endpoint = isLogin ? '/api/login' : '/api/signup';
-      const response = await fetch(`${PI_BASE_URL}${endpoint}`, {
+      const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),

@@ -12,9 +12,9 @@ import {
 import { LineChart } from 'react-native-chart-kit';
 import styles from '../styles/HistoryScreenStyle';
 import { generateMockHistory } from '../services/mockData';
+import { API_URL } from '../config';
 
 const screenWidth = Dimensions.get('window').width;
-const PI_BASE_URL = 'http://192.168.1.48:5000'; // Replace with your Pi's IP
 
 const RANGES = [
   { label: '1h', hours: 1 },
@@ -46,7 +46,7 @@ export default function HistoryScreen({ route, navigation }) {
   const fetchAllData = async () => {
     try {
       setError(null);
-      const response = await fetch(`${PI_BASE_URL}/api/history?hours=720`);
+      const response = await fetch(`${API_URL}/api/history?hours=720`);
       if (!response.ok) throw new Error('Network error');
       const data = await response.json();
       if (Array.isArray(data)) {

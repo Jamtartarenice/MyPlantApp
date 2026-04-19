@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: plant-monitor-api
+    runtime: python
+    repo: https://github.com/Jamtartarenice/MyPlantApp
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: plant-monitor-db
+          property: connectionString
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn plant_api:app
+
+databases:
+  - name: plant-monitor-db
+    plan: free

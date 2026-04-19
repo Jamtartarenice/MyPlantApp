@@ -13,8 +13,8 @@ import CameraPreview from '../components/CameraPreview';
 import styles from '../styles/HomeScreenStyle';
 import { getMockLatestReading, getMockAlerts } from '../services/mockData';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL } from '../config';
 
-const PI_BASE_URL = 'http://192.168.1.48:5000'; // Your Pi's IP
 const MOISTURE_THRESHOLD = 500; // Same as in logger – adjust after calibration
 
 export default function HomeScreen({ navigation, setUserToken }) {
@@ -33,7 +33,7 @@ export default function HomeScreen({ navigation, setUserToken }) {
 
   const fetchLatestData = async () => {
     try {
-      const response = await fetch(`${PI_BASE_URL}/api/latest`);
+      const response = await fetch(`${API_URL}/api/latest`);
       if (!response.ok) throw new Error('Network response not ok');
       const data = await response.json();
       if (data && !data.error) {
@@ -66,7 +66,7 @@ export default function HomeScreen({ navigation, setUserToken }) {
 
   const checkForAlerts = async () => {
     try {
-      const response = await fetch(`${PI_BASE_URL}/api/check-alerts`);
+      const response = await fetch(`${API_URL}/api/check-alerts`);
       if (!response.ok) throw new Error('Network error');
       const result = await response.json();
       if (result.alert_count > 0) {
