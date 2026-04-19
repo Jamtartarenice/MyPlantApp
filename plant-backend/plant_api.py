@@ -58,9 +58,11 @@ def init_db():
         )
     """)
     conn.commit()
+    print("Database tables created/verified")
 
-# Initialize database
-with app.app_context():
+# Initialize database when the app starts
+@app.before_request
+def before_request():
     init_db()
 
 def hash_password(password):
