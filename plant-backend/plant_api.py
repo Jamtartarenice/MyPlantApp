@@ -130,8 +130,37 @@ def signup():
     conn.commit()
 
     token = generate_token()
-    # In a real app, store token in a sessions table
     return jsonify({"message": "User created", "token": token}), 201
+
+@app.route('/api/reading', methods=['POST', 'OPTIONS'])
+def add_reading():
+    if request.method == 'OPTIONS':
+        response = app.make_response('')
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        response.headers.add("Access-Control-Allow-Methods", "POST")
+        return response
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON"}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO sensor_readings 
+        (light_raw, light_percent, air_temperature, air_humidity,
+         soil_moisture_raw, soil_moisture_status, soil_temperature)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """, (
+        data.get('light_raw'),
+        data.get('light_percent'),
+        data.get('air_temperature'),
+        data.get('air_humidity'),
+        data.get('soil_moisture_raw'),
+        data.get('soil_moisture_status'),
+        data.get('soil_temperature')
+    ))
+    conn.commit()
+    return jsonify({"message": "Reading added"}), 201
 
 @app.route('/api/login', methods=['POST', 'OPTIONS'])
 def login():
