@@ -82,4 +82,24 @@ export default StyleSheet.create({
     marginBottom: 10,
   },
   soilTempText: { fontSize: 16, color: '#2E7D32', textAlign: 'center' },
+  cameraContainer: {
+  width: '100%',
+  height: 240,
+  backgroundColor: '#000',
+  position: 'relative',
+},
+cameraWebView: {
+  flex: 1,
+},
+cameraLoadingOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: '#000',
+  zIndex: 1,
+},
 });

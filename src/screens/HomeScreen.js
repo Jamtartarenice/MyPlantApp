@@ -9,13 +9,14 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import CameraPreview from '../components/CameraPreview';
+import { WebView } from 'react-native-webview';
 import styles from '../styles/HomeScreenStyle';
 import { getMockLatestReading, getMockAlerts } from '../services/mockData';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config';
 
-const MOISTURE_THRESHOLD = 500; // Same as in logger – adjust after calibration
+const MOISTURE_THRESHOLD = 500;
+const CAMERA_STREAM_URL = 'https://camera.airplants.online/video_feed';
 
 export default function HomeScreen({ navigation, setUserToken }) {
   const [loading, setLoading] = useState(true);
@@ -29,6 +30,7 @@ export default function HomeScreen({ navigation, setUserToken }) {
   });
   const [alerts, setAlerts] = useState([]);
   const [isUsingMock, setIsUsingMock] = useState(false);
+  const [cameraLoading, setCameraLoading] = useState(true);
   const lastAlertState = useRef('');
 
   const fetchLatestData = async () => {
@@ -113,10 +115,9 @@ export default function HomeScreen({ navigation, setUserToken }) {
     Alert.alert('Help', 'Contact support at plant@monitor.com');
   };
 
-  // Logout function
   const handleLogout = async () => {
     await AsyncStorage.clear();
-    setUserToken(null); // This will switch back to Login screen
+    setUserToken(null);
   };
 
   const formatValue = (value, unit, decimals = 1) => {
@@ -144,7 +145,39 @@ export default function HomeScreen({ navigation, setUserToken }) {
     <ScrollView showsVerticalScrollIndicator={false} style={styles.container}>
       <StatusBar style="dark" />
 
-      <CameraPreview />
+      <View style={styles.cameraContainer}>
+        {cameraLoading && (
+          <View style={styles.cameraLoadingOverlay}>
+            <ActivityIndicator size="large" color="#4CAF50" />
+            <Text>Loading plant camera...</Text>
+          </View>
+        )}
+<WebView
+  source={{ html: `
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+        <style>
+          body { margin: 0; padding: 0; background: black; }
+          img { width: 100%; height: 100%; object-fit: cover; }
+        </style>
+      </head>
+      <body>
+        <img src="${CAMERA_STREAM_URL}" />
+      </body>
+    </html>
+  ` }}
+  style={styles.cameraWebView}
+  onLoad={() => setCameraLoading(false)}
+  onError={() => {
+    setCameraLoading(false);
+    Alert.alert('Camera Error', 'Unable to load the plant camera stream.');
+  }}
+  scrollEnabled={false}
+  bounces={false}
+  cacheEnabled={false}
+/>
+      </View>
 
       <View style={styles.header}>
         <View style={{ width: 28 }} />
@@ -173,9 +206,7 @@ export default function HomeScreen({ navigation, setUserToken }) {
 
       <Text style={styles.plantName}>Monstera Deliciosa</Text>
 
-      {/* Sensor grid */}
       <View style={styles.grid}>
-        {/* Light */}
         <TouchableOpacity
           style={[styles.card, styles.cardLight]}
           onPress={() => handleCardPress('light')}
@@ -195,7 +226,6 @@ export default function HomeScreen({ navigation, setUserToken }) {
           </Text>
         </TouchableOpacity>
 
-        {/* Temperature */}
         <TouchableOpacity
           style={[styles.card, styles.cardTemp]}
           onPress={() => handleCardPress('temperature')}
@@ -215,7 +245,6 @@ export default function HomeScreen({ navigation, setUserToken }) {
           </Text>
         </TouchableOpacity>
 
-        {/* Humidity */}
         <TouchableOpacity
           style={[styles.card, styles.cardHumidity]}
           onPress={() => handleCardPress('humidity')}
@@ -235,7 +264,6 @@ export default function HomeScreen({ navigation, setUserToken }) {
           </Text>
         </TouchableOpacity>
 
-        {/* Moisture (numeric) */}
         <TouchableOpacity
           style={[styles.card, styles.cardMoisture]}
           onPress={() => handleCardPress('moisture')}
@@ -250,7 +278,6 @@ export default function HomeScreen({ navigation, setUserToken }) {
         </TouchableOpacity>
       </View>
 
-      {/* Soil temperature */}
       {sensorData.soil_temperature !== null && (
         <TouchableOpacity
           style={styles.soilTempRow}
@@ -271,7 +298,6 @@ export default function HomeScreen({ navigation, setUserToken }) {
         </Text>
       </View>
       
-      {/* Logout button (dev only) */}
       <TouchableOpacity
         onPress={handleLogout}
         style={{ marginTop: 10, marginBottom: 20, alignItems: 'center' }}
