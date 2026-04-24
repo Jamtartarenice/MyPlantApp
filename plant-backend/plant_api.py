@@ -54,19 +54,19 @@ def init_db():
         )
     """)
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS sensor_readings (
-            id SERIAL PRIMARY KEY,
-            plant_id INTEGER REFERENCES plants(id) ON DELETE CASCADE,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            light_raw INTEGER,
-            light_percent REAL,
-            air_temperature REAL,
-            air_humidity REAL,
-            soil_moisture_raw INTEGER,
-            soil_moisture_status TEXT,
-            soil_temperature REAL,
-            notes TEXT
-        )
+CREATE TABLE IF NOT EXISTS sensor_readings (
+    id SERIAL PRIMARY KEY,
+    plant_id INTEGER REFERENCES plants(id),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    light_raw INTEGER,
+    light_percent REAL,
+    air_temperature REAL,
+    air_humidity REAL,
+    soil_moisture_raw INTEGER,
+    soil_moisture_status TEXT,
+    soil_temperature REAL,
+    notes TEXT
+)
     """)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS pending_notifications (
