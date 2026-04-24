@@ -44,15 +44,10 @@ export default function App() {
             </Stack.Screen>
           ) : (
             <>
-              <Stack.Screen
-                name="PlantsList"
-                component={PlantsListScreen}
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen
-                name="PlantDetail"
-                options={{ headerShown: false }}
-              >
+              <Stack.Screen name="PlantsList" options={{ headerShown: false }}>
+                {props => <PlantsListScreen {...props} setUserToken={setUserToken} />}
+              </Stack.Screen>
+              <Stack.Screen name="PlantDetail" options={{ headerShown: false }}>
                 {props => <PlantDetailScreen {...props} setUserToken={setUserToken} />}
               </Stack.Screen>
               <Stack.Screen

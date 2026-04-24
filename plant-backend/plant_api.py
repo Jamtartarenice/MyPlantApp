@@ -156,12 +156,13 @@ def get_plants():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("""
-        SELECT DISTINCT p.id, p.name, p.owner_id, u.username as owner_username,
-               (p.owner_id = %s) as is_owner
+        SELECT p.id, p.name, p.owner_id, u.username as owner_username,
+               (p.owner_id = %s) as is_owner, p.created_at
         FROM plants p
         LEFT JOIN user_plant_access upa ON upa.plant_id = p.id
         LEFT JOIN users u ON u.id = p.owner_id
         WHERE p.owner_id = %s OR upa.user_id = %s
+        GROUP BY p.id, u.username, p.owner_id, p.created_at
         ORDER BY p.created_at DESC
     """, (user['id'], user['id'], user['id']))
     plants = cur.fetchall()

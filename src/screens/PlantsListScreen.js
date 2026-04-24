@@ -13,7 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config';
 
-export default function PlantsListScreen({ navigation }) {
+export default function PlantsListScreen({ navigation, setUserToken }) { // <-- Receive setUserToken
   const [plants, setPlants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -24,6 +24,12 @@ export default function PlantsListScreen({ navigation }) {
       const response = await fetch(`${API_URL}/api/plants`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (response.status === 401) {
+        // Unauthorized – clear token and let App.js handle the screen change
+        await AsyncStorage.clear();
+        setUserToken(null); // This triggers the conditional rendering in App.js
+        return;
+      }
       const data = await response.json();
       if (response.ok) {
         setPlants(data);
@@ -39,6 +45,11 @@ export default function PlantsListScreen({ navigation }) {
     }
   };
 
+  const handleLogout = async () => {
+    await AsyncStorage.clear();
+    setUserToken(null); // This triggers the conditional rendering in App.js
+  };
+
   useEffect(() => {
     fetchPlants();
   }, []);
@@ -49,7 +60,6 @@ export default function PlantsListScreen({ navigation }) {
   };
 
   const createNewPlant = async () => {
-    // Simple prompt for plant name (could use a modal)
     Alert.prompt(
       'New Plant',
       'Enter plant name:',
@@ -104,9 +114,14 @@ export default function PlantsListScreen({ navigation }) {
       <StatusBar style="dark" />
       <View style={styles.header}>
         <Text style={styles.title}>My Plants</Text>
-        <TouchableOpacity onPress={createNewPlant} style={styles.addButton}>
-          <Text style={styles.addButtonText}>+</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row' }}>
+          <TouchableOpacity onPress={createNewPlant} style={styles.addButton}>
+            <Text style={styles.addButtonText}>+</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <Text style={styles.logoutButtonText}>🚪</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       <FlatList
         data={plants}
@@ -139,8 +154,18 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 10,
   },
   addButtonText: { color: '#fff', fontSize: 28, fontWeight: 'bold' },
+  logoutButton: {
+    backgroundColor: '#f44336',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoutButtonText: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
   list: { paddingHorizontal: 20, paddingBottom: 20 },
   plantCard: {
     backgroundColor: '#fff',
