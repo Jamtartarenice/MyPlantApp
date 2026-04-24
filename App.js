@@ -7,7 +7,8 @@ import { ActivityIndicator, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import LoginScreen from './src/screens/LoginScreen';
-import HomeScreen from './src/screens/HomeScreen';
+import PlantsListScreen from './src/screens/PlantsListScreen';
+import PlantDetailScreen from './src/screens/PlantsDetailScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 
 const Stack = createStackNavigator();
@@ -16,7 +17,6 @@ export default function App() {
   const [userToken, setUserToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load token on startup
   useEffect(() => {
     const loadToken = async () => {
       const token = await AsyncStorage.getItem('userToken');
@@ -44,8 +44,16 @@ export default function App() {
             </Stack.Screen>
           ) : (
             <>
-              <Stack.Screen name="Home" options={{ headerShown: false }}>
-                {props => <HomeScreen {...props} setUserToken={setUserToken} />}
+              <Stack.Screen
+                name="PlantsList"
+                component={PlantsListScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="PlantDetail"
+                options={{ headerShown: false }}
+              >
+                {props => <PlantDetailScreen {...props} setUserToken={setUserToken} />}
               </Stack.Screen>
               <Stack.Screen
                 name="History"

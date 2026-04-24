@@ -1,4 +1,4 @@
-// src/screens/HomeScreen.js
+// src/screens/PlantDetailScreen.js
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ScrollView,
@@ -14,11 +14,13 @@ import styles from '../styles/HomeScreenStyle';
 import { getMockLatestReading, getMockAlerts } from '../services/mockData';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config';
+import AddFriendModal from '../components/AddFriend';
 
 const MOISTURE_THRESHOLD = 500;
 const CAMERA_STREAM_URL = 'https://camera.airplants.online/video_feed';
 
-export default function HomeScreen({ navigation, setUserToken }) {
+export default function PlantDetailScreen({ navigation, route, setUserToken }) {
+  const { plantId, plantName } = route.params;
   const [loading, setLoading] = useState(true);
   const [sensorData, setSensorData] = useState({
     light_percent: null,
@@ -31,11 +33,15 @@ export default function HomeScreen({ navigation, setUserToken }) {
   const [alerts, setAlerts] = useState([]);
   const [isUsingMock, setIsUsingMock] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(true);
+  const [shareModalVisible, setShareModalVisible] = useState(false);
   const lastAlertState = useRef('');
 
   const fetchLatestData = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/latest`);
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await fetch(`${API_URL}/api/latest?plantId=${plantId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!response.ok) throw new Error('Network response not ok');
       const data = await response.json();
       if (data && !data.error) {
@@ -52,14 +58,7 @@ export default function HomeScreen({ navigation, setUserToken }) {
     } catch (error) {
       console.log('Error fetching sensor data, using mock:', error);
       const mock = getMockLatestReading();
-      setSensorData({
-        light_percent: mock.light_percent,
-        air_temperature: mock.air_temperature,
-        air_humidity: mock.air_humidity,
-        soil_moisture_raw: mock.soil_moisture_raw,
-        soil_temperature: mock.soil_temperature,
-        timestamp: mock.timestamp,
-      });
+      setSensorData(mock);
       setIsUsingMock(true);
     } finally {
       setLoading(false);
@@ -68,7 +67,10 @@ export default function HomeScreen({ navigation, setUserToken }) {
 
   const checkForAlerts = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/check-alerts`);
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await fetch(`${API_URL}/api/check-alerts?plantId=${plantId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!response.ok) throw new Error('Network error');
       const result = await response.json();
       if (result.alert_count > 0) {
@@ -105,14 +107,10 @@ export default function HomeScreen({ navigation, setUserToken }) {
       clearInterval(dataInterval);
       clearInterval(alertInterval);
     };
-  }, []);
+  }, [plantId]);
 
   const handleCardPress = (sensor) => {
-    navigation.navigate('History', { sensor });
-  };
-
-  const handleHelpPress = () => {
-    Alert.alert('Help', 'Contact support at plant@monitor.com');
+    navigation.navigate('History', { sensor, plantId });
   };
 
   const handleLogout = async () => {
@@ -145,6 +143,13 @@ export default function HomeScreen({ navigation, setUserToken }) {
     <ScrollView showsVerticalScrollIndicator={false} style={styles.container}>
       <StatusBar style="dark" />
 
+      <View style={styles.shareHeader}>
+        <Text style={styles.plantName}>{plantName}</Text>
+        <TouchableOpacity onPress={() => setShareModalVisible(true)} style={styles.shareIcon}>
+          <Text style={{ fontSize: 24 }}>👥</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.cameraContainer}>
         {cameraLoading && (
           <View style={styles.cameraLoadingOverlay}>
@@ -152,31 +157,31 @@ export default function HomeScreen({ navigation, setUserToken }) {
             <Text>Loading plant camera...</Text>
           </View>
         )}
-<WebView
-  source={{ html: `
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-        <style>
-          body { margin: 0; padding: 0; background: black; }
-          img { width: 100%; height: 100%; object-fit: cover; }
-        </style>
-      </head>
-      <body>
-        <img src="${CAMERA_STREAM_URL}" />
-      </body>
-    </html>
-  ` }}
-  style={styles.cameraWebView}
-  onLoad={() => setCameraLoading(false)}
-  onError={() => {
-    setCameraLoading(false);
-    Alert.alert('Camera Error', 'Unable to load the plant camera stream.');
-  }}
-  scrollEnabled={false}
-  bounces={false}
-  cacheEnabled={false}
-/>
+        <WebView
+          source={{ html: `
+            <html>
+              <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+                <style>
+                  body { margin: 0; padding: 0; background: black; }
+                  img { width: 100%; height: 100%; object-fit: cover; }
+                </style>
+              </head>
+              <body>
+                <img src="${CAMERA_STREAM_URL}" />
+              </body>
+            </html>
+          ` }}
+          style={styles.cameraWebView}
+          onLoad={() => setCameraLoading(false)}
+          onError={() => {
+            setCameraLoading(false);
+            Alert.alert('Camera Error', 'Unable to load the plant camera stream.');
+          }}
+          scrollEnabled={false}
+          bounces={false}
+          cacheEnabled={false}
+        />
       </View>
 
       <View style={styles.header}>
@@ -203,8 +208,6 @@ export default function HomeScreen({ navigation, setUserToken }) {
           ))}
         </View>
       )}
-
-      <Text style={styles.plantName}>Monstera Deliciosa</Text>
 
       <View style={styles.grid}>
         <TouchableOpacity
@@ -297,13 +300,20 @@ export default function HomeScreen({ navigation, setUserToken }) {
             : 'never'}
         </Text>
       </View>
-      
+
       <TouchableOpacity
         onPress={handleLogout}
         style={{ marginTop: 10, marginBottom: 20, alignItems: 'center' }}
       >
-        <Text style={{ color: '#f44336', fontSize: 16 }}>🚪 Logout (dev only)</Text>
+        <Text style={{ color: '#f44336', fontSize: 16 }}>🚪 Logout</Text>
       </TouchableOpacity>
+
+      <AddFriendModal
+        visible={shareModalVisible}
+        plantId={plantId}
+        onClose={() => setShareModalVisible(false)}
+        onSuccess={() => Alert.alert('Shared!', 'Your friend can now view this plant.')}
+      />
     </ScrollView>
   );
 }

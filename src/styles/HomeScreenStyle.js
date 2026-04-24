@@ -91,6 +91,16 @@ export default StyleSheet.create({
 cameraWebView: {
   flex: 1,
 },
+shareHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+  paddingVertical: 10,
+},
+shareIcon: {
+  padding: 8,
+},
 cameraLoadingOverlay: {
   position: 'absolute',
   top: 0,
