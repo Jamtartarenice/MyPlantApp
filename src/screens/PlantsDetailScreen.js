@@ -110,7 +110,7 @@ export default function PlantDetailScreen({ navigation, route, setUserToken }) {
   }, [plantId]);
 
   const handleCardPress = (sensor) => {
-    navigation.navigate('History', { sensor, plantId });
+    navigation.navigate('History', { sensor: sensor, plantId: plantId });
   };
 
   const handleLogout = async () => {
